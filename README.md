@@ -55,7 +55,8 @@ access to `api.binance.com`.
 - `lib/db.ts` — Postgres subscriber storage (works with any standard
   Postgres connection string — Neon, Supabase, etc.)
 - `lib/newsletter.ts` — digest content: market dominance (CoinGecko), news
-  (CryptoCompare), and a chart image (QuickChart) — all free, no API key
+  (CoinDesk & CoinTelegraph public RSS feeds), and a chart image
+  (QuickChart) — all free, no API key
 - `lib/mailer.ts` — sends via your own Gmail account (App Password)
 
 ## Newsletter setup
