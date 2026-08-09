@@ -1,5 +1,13 @@
-// Digest content sourced entirely from free, no-key public APIs:
-// CoinGecko (market dominance), CryptoCompare (news), QuickChart (chart image).
+// Digest content sourced entirely from free, no-key public sources:
+// CoinGecko (market dominance), public RSS feeds (news), QuickChart (chart image).
+
+import Parser from "rss-parser";
+
+const rssParser = new Parser();
+const NEWS_FEEDS = [
+  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", source: "CoinDesk" },
+  { url: "https://cointelegraph.com/rss", source: "CoinTelegraph" },
+];
 
 export type DominanceEntry = { symbol: string; pct: number };
 
@@ -31,15 +39,31 @@ export async function fetchDominance(): Promise<{
   };
 }
 
+type NewsItem = { title: string; url: string; source: string; publishedAt: number };
+
 export async function fetchNews(limit = 5): Promise<DigestData["news"]> {
-  const res = await fetch("https://min-api.cryptocompare.com/data/v2/news/?lang=EN", { cache: "no-store" });
-  if (!res.ok) throw new Error("CryptoCompare news API error " + res.status);
-  const json = await res.json();
-  return (json.Data as { title: string; url: string; source: string }[]).slice(0, limit).map((n) => ({
-    title: n.title,
-    url: n.url,
-    source: n.source,
-  }));
+  const perFeed = await Promise.allSettled(
+    NEWS_FEEDS.map(async (feed): Promise<NewsItem[]> => {
+      const parsed = await rssParser.parseURL(feed.url);
+      return (parsed.items ?? []).map((item) => ({
+        title: item.title ?? "",
+        url: item.link ?? "",
+        source: feed.source,
+        publishedAt: item.pubDate ? new Date(item.pubDate).getTime() : 0,
+      }));
+    })
+  );
+
+  const items: NewsItem[] = [];
+  for (const result of perFeed) {
+    if (result.status === "fulfilled") items.push(...result.value);
+  }
+
+  return items
+    .filter((item) => item.title && item.url)
+    .sort((a, b) => b.publishedAt - a.publishedAt)
+    .slice(0, limit)
+    .map(({ title, url, source }) => ({ title, url, source }));
 }
 
 export function buildDominanceChartUrl(dominance: DominanceEntry[]): string {
@@ -114,6 +138,15 @@ export function renderDigestEmailHtml(digest: DigestData, unsubscribeUrl: string
     )
     .join("");
 
+  const newsSection =
+    digest.news.length > 0
+      ? `
+        <h2 style="font-size:16px;color:#171b21;margin:0 0 4px;">Top headlines</h2>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          ${newsItems}
+        </table>`
+      : "";
+
   return `
 <!doctype html>
 <html>
@@ -135,15 +168,12 @@ export function renderDigestEmailHtml(digest: DigestData, unsubscribeUrl: string
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           ${dominanceRows}
         </table>
-        <h2 style="font-size:16px;color:#171b21;margin:0 0 4px;">Top headlines</h2>
-        <table width="100%" cellpadding="0" cellspacing="0">
-          ${newsItems}
-        </table>
+        ${newsSection}
       </td>
     </tr>
     <tr>
       <td style="padding:16px 24px;background:#f7f8fa;color:#8b95a5;font-size:11px;">
-        Market data via CoinGecko, news via CryptoCompare. Not financial advice.
+        Market data via CoinGecko, news via CoinDesk &amp; CoinTelegraph. Not financial advice.
         <a href="${unsubscribeUrl}" style="color:#8b95a5;">Unsubscribe</a>
       </td>
     </tr>
