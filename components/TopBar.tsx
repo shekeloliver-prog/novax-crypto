@@ -17,7 +17,10 @@ export function TopBar() {
           Markets
         </Link>
         <Link className="hover:text-zinc-100" href="/#portfolio">
-          Portfolio
+          Sample
+        </Link>
+        <Link className="hover:text-zinc-100" href="/trade">
+          Trade
         </Link>
         <Link className="hover:text-zinc-100" href="/subscribe">
           Digest

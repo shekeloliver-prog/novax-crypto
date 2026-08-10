@@ -1,14 +1,17 @@
-# NovaX — Live Crypto Market Dashboard (View-Only)
+# NovaX — Live Crypto Market Dashboard
 
 A crypto market dashboard built with Next.js, Tailwind CSS, and
 [lightweight-charts](https://tradingview.github.io/lightweight-charts/), showing
-**real, live market data** pulled from Binance's public REST API.
+**real, live market data** pulled from Binance's public REST API (with a
+Coinbase fallback if Binance is unreachable).
 
-**This is a view-only dashboard, not a trading platform.** There is no buy/sell
-functionality, no user account, no wallet, and no real money moves anywhere in
-this project — it only displays live public market data. The "Sample Portfolio"
-table is illustrative: fixed example holdings priced against the real live
-tickers, not anything you can buy or sell here.
+**No real money moves anywhere in this project.** The main dashboard is
+view-only — the "Sample Portfolio" table there is illustrative, fixed example
+holdings priced against live tickers, not anything you can trade. The
+separate `/trade` page is a paper-trading game: you sign up for a free
+account, start with $8,750 in simulated cash, and can buy/sell at live
+prices to see if your (fake) portfolio goes up or down. Still no real
+exchange, wallet, or funds involved anywhere.
 
 ## Features
 
@@ -16,7 +19,9 @@ tickers, not anything you can buy or sell here.
 - Candlestick + volume chart per asset (1h candles, live from Binance)
 - Real order book (bids/asks) and recent trades feed
 - Sample portfolio table (fixed example quantities, valued at live prices)
-- No buying, no selling, no funds involved
+- **Paper trading** (`/trade`): sign up/sign in, start with $8,750 simulated
+  cash, buy/sell at live prices, track gain/loss — progress saved per
+  account (see **Accounts setup** below)
 - Optional: a "Crypto Digest" email newsletter — anyone can subscribe with
   their email, and once every 3 days gets a digest with market dominance,
   a chart, and top headlines (see **Newsletter setup** below)
@@ -58,6 +63,21 @@ access to `api.binance.com`.
   (CoinDesk & CoinTelegraph public RSS feeds), and a chart image
   (QuickChart) — all free, no API key
 - `lib/mailer.ts` — sends via your own Gmail account (App Password)
+- `app/trade` — paper-trading page (sign up/in, buy/sell, holdings)
+- `app/api/auth/*` — sign up, sign in, sign out
+- `app/api/portfolio` — current user's cash, holdings, and gain/loss
+- `app/api/trade` — executes a buy or sell at the live price
+- `lib/auth.ts` — password hashing and session cookies (Node's built-in
+  `crypto` only, no extra auth dependency)
+
+## Accounts setup (for `/trade`)
+
+Uses the same `DATABASE_URL` as the newsletter (see below) to store
+accounts, holdings, and trade history — no separate database needed. Just
+add one more value:
+
+- **`SESSION_SECRET`** — a second long random string you make up yourself
+  (different from `CRON_SECRET`), signs the sign-in session cookie.
 
 ## Newsletter setup
 
