@@ -64,7 +64,8 @@ access to `api.binance.com`.
   (QuickChart) — all free, no API key
 - `lib/mailer.ts` — sends via your own Gmail account (App Password)
 - `app/trade` — paper-trading page (sign up/in, buy/sell, holdings)
-- `app/api/auth/*` — sign up, sign in, sign out
+- `app/reset-password` — set a new password from an emailed reset link
+- `app/api/auth/*` — sign up, sign in, sign out, forgot/reset password
 - `app/api/portfolio` — current user's cash, holdings, and gain/loss
 - `app/api/trade` — executes a buy or sell at the live price
 - `lib/auth.ts` — password hashing and session cookies (Node's built-in
@@ -72,12 +73,17 @@ access to `api.binance.com`.
 
 ## Accounts setup (for `/trade`)
 
-Uses the same `DATABASE_URL` as the newsletter (see below) to store
-accounts, holdings, and trade history — no separate database needed. Just
-add one more value:
+Uses the same `DATABASE_URL` and Gmail sending config as the newsletter
+(see below) — no separate database or email account needed. Just add one
+more value:
 
 - **`SESSION_SECRET`** — a second long random string you make up yourself
   (different from `CRON_SECRET`), signs the sign-in session cookie.
+
+Forgot-password links are sent from the same Gmail account configured for
+the newsletter (`GMAIL_USER` / `GMAIL_APP_PASSWORD`) and expire after 1
+hour. Passwords are hashed with `scrypt` (Node's built-in, no extra
+dependency) — never stored in plain text or recoverable, even by you.
 
 ## Newsletter setup
 

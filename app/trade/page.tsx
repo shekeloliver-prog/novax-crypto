@@ -23,11 +23,12 @@ function formatUsd(value: number): string {
 }
 
 export default function TradePage() {
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
 
   const [signedIn, setSignedIn] = useState<boolean | null>(null); // null = checking
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -90,6 +91,26 @@ export default function TradePage() {
       }
       setPassword("");
       await loadPortfolio();
+    } catch {
+      setAuthError("Network error — try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function handleForgotSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthError("");
+    setForgotMessage("");
+    setAuthLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setForgotMessage(data.message ?? "If an account with that email exists, a reset link has been sent.");
     } catch {
       setAuthError("Network error — try again.");
     } finally {
@@ -165,33 +186,81 @@ export default function TradePage() {
             </button>
           </div>
 
-          <form onSubmit={handleAuthSubmit} className="flex flex-col gap-3">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
-            />
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password (6+ characters)"
-              className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
-            />
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full rounded-md py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : "Sign In"}
-            </button>
-            {authError && <p className="text-xs text-red-500">{authError}</p>}
-          </form>
+          {authMode === "forgot" ? (
+            <form onSubmit={handleForgotSubmit} className="flex flex-col gap-3">
+              <p className="text-xs text-zinc-500">
+                Enter your account email and we&apos;ll send you a link to set a new password.
+              </p>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full rounded-md py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {authLoading ? "Sending…" : "Send Reset Link"}
+              </button>
+              {forgotMessage && <p className="text-xs text-emerald-500">{forgotMessage}</p>}
+              {authError && <p className="text-xs text-red-500">{authError}</p>}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("signin");
+                  setForgotMessage("");
+                  setAuthError("");
+                }}
+                className="text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer"
+              >
+                ← Back to sign in
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleAuthSubmit} className="flex flex-col gap-3">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+              />
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password (6+ characters)"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full rounded-md py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {authLoading ? "Please wait…" : authMode === "signup" ? "Create Account" : "Sign In"}
+              </button>
+              {authError && <p className="text-xs text-red-500">{authError}</p>}
+              {authMode === "signin" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("forgot");
+                    setAuthError("");
+                  }}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer text-left"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </form>
+          )}
 
           <p className="text-xs text-zinc-600 mt-4">
             Simulated money only — no real funds, no real exchange, nothing here is financial advice.

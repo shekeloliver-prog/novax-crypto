@@ -60,6 +60,13 @@ export async function ensureSchema(): Promise<void> {
       total NUMERIC NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id SERIAL PRIMARY KEY,
+      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    );
   `);
 }
 
@@ -245,4 +252,34 @@ export async function executeTrade(
   } finally {
     client.release();
   }
+}
+
+// --- Password reset ---
+
+export async function createPasswordReset(userId: number, token: string, expiresAt: Date): Promise<void> {
+  await getPool().query(`INSERT INTO password_resets (user_id, token, expires_at) VALUES ($1, $2, $3)`, [
+    userId,
+    token,
+    expiresAt,
+  ]);
+}
+
+export async function getValidPasswordReset(token: string): Promise<{ userId: number } | null> {
+  const result = await getPool().query<{ user_id: number }>(
+    `SELECT user_id FROM password_resets WHERE token = $1 AND used_at IS NULL AND expires_at > now()`,
+    [token]
+  );
+  return result.rows[0] ? { userId: result.rows[0].user_id } : null;
+}
+
+export async function markPasswordResetUsed(token: string): Promise<void> {
+  await getPool().query(`UPDATE password_resets SET used_at = now() WHERE token = $1`, [token]);
+}
+
+export async function updateUserPassword(userId: number, passwordHash: string, passwordSalt: string): Promise<void> {
+  await getPool().query(`UPDATE users SET password_hash = $1, password_salt = $2 WHERE id = $3`, [
+    passwordHash,
+    passwordSalt,
+    userId,
+  ]);
 }

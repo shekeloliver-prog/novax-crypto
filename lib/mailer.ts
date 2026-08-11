@@ -15,7 +15,7 @@ function getTransport() {
   });
 }
 
-export async function sendDigestEmail(to: string, subject: string, html: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const transport = getTransport();
   await transport.sendMail({
     from: process.env.GMAIL_USER,
@@ -24,3 +24,5 @@ export async function sendDigestEmail(to: string, subject: string, html: string)
     html,
   });
 }
+
+export const sendDigestEmail = sendEmail;
