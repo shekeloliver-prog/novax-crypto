@@ -56,7 +56,13 @@ async function handleSend(req: Request) {
       }
     }
 
-    await setLastSentAt(now);
+    // Only mark this cycle as "done" if at least one email actually went
+    // out. If every send failed (e.g. Gmail credentials broken), leave
+    // last_sent_at untouched so tomorrow's cron tick retries the whole
+    // batch instead of silently waiting 3 more days.
+    if (sent > 0) {
+      await setLastSentAt(now);
+    }
     return NextResponse.json({ sent, failed: failures.length, failures });
   } catch (err) {
     return NextResponse.json(
