@@ -18,9 +18,17 @@ const SEND_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000;
 // var is set). It only actually sends once 3+ days have passed since the
 // last send, so the exact cron cadence doesn't need to be precise. POST is
 // kept too, for manual triggering (e.g. curl) during setup/testing.
+//
+// For manual testing straight from a browser (no terminal needed), the
+// secret can also be passed as ?secret=... in the URL instead of the
+// Authorization header — visit /api/newsletter/send?secret=YOUR_CRON_SECRET.
 async function handleSend(req: Request) {
   const auth = req.headers.get("authorization");
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secretParam = new URL(req.url).searchParams.get("secret");
+  const authorized =
+    process.env.CRON_SECRET != null &&
+    (auth === `Bearer ${process.env.CRON_SECRET}` || secretParam === process.env.CRON_SECRET);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
