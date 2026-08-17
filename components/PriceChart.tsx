@@ -24,6 +24,7 @@ export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const hasFitContentRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -45,6 +46,7 @@ export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
       crosshair: { mode: 0 },
     });
     chartRef.current = chart;
+    hasFitContentRef.current = false;
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#10b981",
@@ -103,7 +105,10 @@ export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
         color: c.close >= c.open ? "#10b98166" : "#ef444466",
       }))
     );
-    chartRef.current?.timeScale().fitContent();
+    if (!hasFitContentRef.current) {
+      chartRef.current?.timeScale().fitContent();
+      hasFitContentRef.current = true;
+    }
   }, [candles]);
 
   return (
