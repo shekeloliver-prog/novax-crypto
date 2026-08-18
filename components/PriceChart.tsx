@@ -17,9 +17,11 @@ type PriceChartProps = {
   coin: Coin;
   candles: Candle[];
   ticker?: Ticker;
+  rangeKey?: string;
+  rangeLabel?: string;
 };
 
-export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
+export function PriceChart({ coin, candles, ticker, rangeKey, rangeLabel }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -85,6 +87,10 @@ export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
   }, [coin.symbol]);
 
   useEffect(() => {
+    hasFitContentRef.current = false;
+  }, [rangeKey]);
+
+  useEffect(() => {
     const candleSeries = candleSeriesRef.current;
     const volumeSeries = volumeSeriesRef.current;
     if (!candleSeries || !volumeSeries || candles.length === 0) return;
@@ -120,7 +126,7 @@ export function PriceChart({ coin, candles, ticker }: PriceChartProps) {
             ${formatPrice(ticker.lastPrice)}
           </span>
         )}
-        <span className="text-xs text-zinc-500">1H candles · live from Binance</span>
+        <span className="text-xs text-zinc-500">{rangeLabel ?? "1H candles"} · live from Binance</span>
       </div>
       <div ref={containerRef} className="w-full" />
     </div>
