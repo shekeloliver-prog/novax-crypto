@@ -25,6 +25,7 @@ export const SYMBOL_MAP: Record<string, string> = {
   ETC: "ETCUSDT",
   FIL: "FILUSDT",
   NEAR: "NEARUSDT",
+  SUI: "SUIUSDT",
 };
 
 const COINBASE_SYMBOL_MAP: Record<string, string> = {
@@ -44,6 +45,7 @@ const COINBASE_SYMBOL_MAP: Record<string, string> = {
   ETC: "ETC-USD",
   FIL: "FIL-USD",
   NEAR: "NEAR-USD",
+  SUI: "SUI-USD",
 };
 
 export type Candle = {
