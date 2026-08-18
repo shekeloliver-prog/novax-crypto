@@ -20,6 +20,7 @@ export const COINS: Coin[] = [
   { symbol: "ETC", name: "Ethereum Classic" },
   { symbol: "FIL", name: "Filecoin" },
   { symbol: "NEAR", name: "NEAR Protocol" },
+  { symbol: "SUI", name: "Sui" },
 ];
 
 // Illustrative holdings for the sample portfolio view — quantities only,
