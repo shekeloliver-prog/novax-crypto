@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { COINS } from "@/lib/coins";
 
 type Holding = { symbol: string; quantity: number; price: number | null; value: number };
 type Trade = { id: number; symbol: string; side: "buy" | "sell"; quantity: number; price: number; total: number; created_at: string };
 type Portfolio = {
   email: string;
+  displayName: string | null;
   cashBalance: number;
   holdings: Holding[];
   holdingsValue: number;
@@ -26,9 +28,14 @@ export default function TradePage() {
   const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupDisplayName, setSignupDisplayName] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState("");
+
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameError, setNameError] = useState("");
 
   const [signedIn, setSignedIn] = useState<boolean | null>(null); // null = checking
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -79,10 +86,14 @@ export default function TradePage() {
     setAuthError("");
     setAuthLoading(true);
     try {
+      const body =
+        authMode === "signup"
+          ? { email, password, displayName: signupDisplayName }
+          : { email, password };
       const res = await fetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -122,6 +133,29 @@ export default function TradePage() {
     await fetch("/api/auth/signout", { method: "POST" });
     setSignedIn(false);
     setPortfolio(null);
+  }
+
+  async function handleSaveDisplayName(e: React.FormEvent) {
+    e.preventDefault();
+    setNameError("");
+    setNameSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: nameDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNameError(data.error ?? "Couldn't save that name.");
+        return;
+      }
+      await loadPortfolio();
+    } catch {
+      setNameError("Network error — try again.");
+    } finally {
+      setNameSaving(false);
+    }
   }
 
   async function handleTrade(e: React.FormEvent) {
@@ -230,6 +264,18 @@ export default function TradePage() {
                 placeholder="you@example.com"
                 className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
               />
+              {authMode === "signup" && (
+                <input
+                  type="text"
+                  required
+                  minLength={2}
+                  maxLength={24}
+                  value={signupDisplayName}
+                  onChange={(e) => setSignupDisplayName(e.target.value)}
+                  placeholder="Display name (shown on leaderboard)"
+                  className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-600"
+                />
+              )}
               <input
                 type="password"
                 required
@@ -280,15 +326,50 @@ export default function TradePage() {
     <main className="flex-1 px-4 sm:px-6 py-6 max-w-[1100px] w-full mx-auto flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="text-sm text-zinc-400">
-          Signed in as <span className="text-zinc-100">{portfolio.email}</span>
+          Signed in as <span className="text-zinc-100">{portfolio.displayName ?? portfolio.email}</span>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="text-xs text-zinc-500 hover:text-zinc-300 border border-zinc-800 rounded px-2 py-1 cursor-pointer"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/leaderboard"
+            className="text-xs text-zinc-500 hover:text-zinc-300 border border-zinc-800 rounded px-2 py-1"
+          >
+            Leaderboard
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="text-xs text-zinc-500 hover:text-zinc-300 border border-zinc-800 rounded px-2 py-1 cursor-pointer"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
+
+      {!portfolio.displayName && (
+        <form
+          onSubmit={handleSaveDisplayName}
+          className="flex flex-wrap items-center gap-2 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2 text-xs"
+        >
+          <span className="text-amber-500">Pick a display name to show up on the leaderboard:</span>
+          <input
+            type="text"
+            required
+            minLength={2}
+            maxLength={24}
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            placeholder="Display name"
+            className="rounded-md bg-zinc-900 border border-zinc-800 px-2 py-1 text-zinc-100 outline-none focus:border-zinc-600"
+          />
+          <button
+            type="submit"
+            disabled={nameSaving}
+            className="px-2.5 py-1 rounded-md font-semibold bg-amber-500 hover:bg-amber-400 text-black disabled:opacity-50 cursor-pointer"
+          >
+            {nameSaving ? "Saving…" : "Save"}
+          </button>
+          {nameError && <span className="text-red-500">{nameError}</span>}
+        </form>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="border border-zinc-800 rounded-lg p-4">
