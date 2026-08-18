@@ -8,6 +8,8 @@ import { PriceChart } from "@/components/PriceChart";
 import { OrderBook } from "@/components/OrderBook";
 import { RecentTrades } from "@/components/RecentTrades";
 import { PortfolioTable } from "@/components/PortfolioTable";
+import { TimeRangeSelector } from "@/components/TimeRangeSelector";
+import { DEFAULT_RANGE, labelForRange, rangeKeyOf, type RangeSelection } from "@/lib/timeRanges";
 
 const TICKER_POLL_MS = 10_000;
 const MARKET_POLL_MS = 8_000;
@@ -28,6 +30,8 @@ export function Dashboard() {
   const [tickers, setTickers] = useState<Ticker[]>([]);
   const [snapshot, setSnapshot] = useState<SymbolSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<RangeSelection>(DEFAULT_RANGE);
+  const rangeKey = rangeKeyOf(range);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +63,11 @@ export function Dashboard() {
 
     async function loadMarket() {
       try {
-        const res = await fetch(`/api/market/${selected}`);
+        const query =
+          range.kind === "custom"
+            ? `?start=${range.startMs}&end=${range.endMs}`
+            : `?range=${range.key}`;
+        const res = await fetch(`/api/market/${selected}${query}`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (!cancelled) {
@@ -77,7 +85,7 @@ export function Dashboard() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [selected]);
+  }, [selected, range]);
 
   const coin = COINS.find((c) => c.symbol === selected) ?? COINS[0];
   const ticker = tickers.find((t) => t.symbol === selected);
@@ -97,7 +105,14 @@ export function Dashboard() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <PriceChart coin={coin} candles={market?.candles ?? []} ticker={ticker} />
+          <TimeRangeSelector value={range} onChange={setRange} />
+          <PriceChart
+            coin={coin}
+            candles={market?.candles ?? []}
+            ticker={ticker}
+            rangeKey={rangeKey}
+            rangeLabel={labelForRange(range)}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <OrderBook coin={coin} orderBook={market?.orderBook} ticker={ticker} />
             <RecentTrades trades={market?.trades ?? []} />
