@@ -1,41 +1,51 @@
 import { NextResponse } from "next/server";
-import { ensureSchema, createUser, getUserByEmail, STARTING_CASH_BALANCE } from "@/lib/db";
-import { hashPassword, setSessionCookie } from "@/lib/auth";
+import { ensureSchema, getUserById, getHoldings, getTrades, STARTING_CASH_BALANCE } from "@/lib/db";
+import { getSessionUserId } from "@/lib/auth";
+import { fetchTicker } from "@/lib/binance";
 
 export const runtime = "nodejs";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  const email = typeof body?.email === "string" ? body.email.trim() : "";
-  const password = typeof body?.password === "string" ? body.password : "";
-  const displayName = typeof body?.displayName === "string" ? body.displayName.trim() : "";
-
-  if (!EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
-  }
-  if (password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
-  }
-  if (displayName.length < 2 || displayName.length > 24) {
-    return NextResponse.json({ error: "Display name must be 2-24 characters." }, { status: 400 });
+export async function GET() {
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
   try {
     await ensureSchema();
-    const existing = await getUserByEmail(email);
-    if (existing) {
-      return NextResponse.json({ error: "An account with that email already exists." }, { status: 409 });
-    }
+    const user = await getUserById(userId);
+    if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-    const { hash, salt } = hashPassword(password);
-    const user = await createUser(email, hash, salt, displayName);
-    await setSessionCookie(user.id);
+    const [holdings, trades] = await Promise.all([getHoldings(userId), getTrades(userId)]);
 
-    return NextResponse.json({ email: user.email, cashBalance: STARTING_CASH_BALANCE });
+    const priced = await Promise.all(
+      holdings.map(async (h) => {
+        try {
+          const ticker = await fetchTicker(h.symbol);
+          return { symbol: h.symbol, quantity: h.quantity, price: ticker.lastPrice, value: h.quantity * ticker.lastPrice };
+        } catch {
+          return { symbol: h.symbol, quantity: h.quantity, price: null, value: 0 };
+        }
+      })
+    );
+
+    const holdingsValue = priced.reduce((sum, h) => sum + h.value, 0);
+    const totalValue = user.cash_balance + holdingsValue;
+
+    return NextResponse.json({
+      email: user.email,
+      displayName: user.display_name,
+      cashBalance: user.cash_balance,
+      holdings: priced,
+      holdingsValue,
+      totalValue,
+      startingBalance: STARTING_CASH_BALANCE,
+      gainLoss: totalValue - STARTING_CASH_BALANCE,
+      gainLossPct: ((totalValue - STARTING_CASH_BALANCE) / STARTING_CASH_BALANCE) * 100,
+      trades,
+    });
   } catch (err) {
-    console.error("signup failed:", err);
-    return NextResponse.json({ error: "Sign up failed. Please try again later." }, { status: 502 });
+    console.error("portfolio fetch failed:", err);
+    return NextResponse.json({ error: "Failed to load portfolio." }, { status: 502 });
   }
 }
