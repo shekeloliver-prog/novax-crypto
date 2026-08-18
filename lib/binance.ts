@@ -76,6 +76,8 @@ export type Ticker = {
   priceChangePercent: number;
 };
 
+export type CandleRange = { startTime: number; endTime: number };
+
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -118,11 +120,16 @@ async function binanceTicker(symbol: string): Promise<Ticker> {
   };
 }
 
-async function binanceCandles(symbol: string, interval: string, limit: number): Promise<Candle[]> {
+async function binanceCandles(
+  symbol: string,
+  interval: string,
+  limit: number,
+  range?: CandleRange
+): Promise<Candle[]> {
   const pair = SYMBOL_MAP[symbol];
-  const data = await getJson<[number, string, string, string, string, string, ...unknown[]][]>(
-    `${BINANCE_BASE_URL}/klines?symbol=${pair}&interval=${interval}&limit=${limit}`
-  );
+  let url = `${BINANCE_BASE_URL}/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
+  if (range) url += `&startTime=${range.startTime}&endTime=${range.endTime}`;
+  const data = await getJson<[number, string, string, string, string, string, ...unknown[]][]>(url);
   return data.map(([openTime, open, high, low, close, volume]) => ({
     time: Math.floor(openTime / 1000),
     open: Number(open),
@@ -170,11 +177,27 @@ async function coinbaseTicker(symbol: string): Promise<Ticker> {
   return { symbol, lastPrice: last, priceChange, priceChangePercent };
 }
 
-async function coinbaseCandles(symbol: string, limit: number): Promise<Candle[]> {
+// Coinbase only supports these fixed granularities (seconds). Used as a
+// fallback only, so intervals with no exact match (e.g. 4h, 1w) round to
+// the nearest supported one rather than failing outright.
+const COINBASE_GRANULARITY: Record<string, number> = {
+  "1m": 60,
+  "5m": 300,
+  "15m": 900,
+  "1h": 3600,
+  "4h": 21600,
+  "1d": 86400,
+  "1w": 86400,
+};
+
+async function coinbaseCandles(symbol: string, interval: string, limit: number, range?: CandleRange): Promise<Candle[]> {
   const pair = COINBASE_SYMBOL_MAP[symbol];
-  const data = await getJson<[number, number, number, number, number, number][]>(
-    `${COINBASE_BASE_URL}/products/${pair}/candles?granularity=3600`
-  );
+  const granularity = COINBASE_GRANULARITY[interval] ?? 3600;
+  let url = `${COINBASE_BASE_URL}/products/${pair}/candles?granularity=${granularity}`;
+  if (range) {
+    url += `&start=${new Date(range.startTime).toISOString()}&end=${new Date(range.endTime).toISOString()}`;
+  }
+  const data = await getJson<[number, number, number, number, number, number][]>(url);
   return data
     .slice()
     .sort((a, b) => a[0] - b[0])
@@ -233,10 +256,15 @@ export async function fetchAllTickers(): Promise<Ticker[]> {
   return Promise.all(Object.keys(SYMBOL_MAP).map(fetchTicker));
 }
 
-export async function fetchCandles(symbol: string, interval = "1h", limit = 180): Promise<Candle[]> {
+export async function fetchCandles(
+  symbol: string,
+  interval = "1h",
+  limit = 180,
+  range?: CandleRange
+): Promise<Candle[]> {
   return withFallback(
-    () => binanceCandles(symbol, interval, limit),
-    () => coinbaseCandles(symbol, limit)
+    () => binanceCandles(symbol, interval, limit, range),
+    () => coinbaseCandles(symbol, interval, limit, range)
   );
 }
 
