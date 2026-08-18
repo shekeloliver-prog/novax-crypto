@@ -41,8 +41,10 @@ export async function ensureSchema(): Promise<void> {
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       cash_balance NUMERIC NOT NULL DEFAULT ${STARTING_CASH_BALANCE},
+      display_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
     CREATE TABLE IF NOT EXISTS holdings (
       id SERIAL PRIMARY KEY,
       user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -115,6 +117,7 @@ export type User = {
   password_hash: string;
   password_salt: string;
   cash_balance: number;
+  display_name: string | null;
 };
 
 export type Holding = { symbol: string; quantity: number };
@@ -131,19 +134,24 @@ export type Trade = {
 
 export { STARTING_CASH_BALANCE };
 
-export async function createUser(email: string, passwordHash: string, passwordSalt: string): Promise<User> {
+export async function createUser(
+  email: string,
+  passwordHash: string,
+  passwordSalt: string,
+  displayName: string
+): Promise<User> {
   const result = await getPool().query<User>(
-    `INSERT INTO users (email, password_hash, password_salt, cash_balance)
-     VALUES ($1, $2, $3, ${STARTING_CASH_BALANCE})
-     RETURNING id, email, password_hash, password_salt, cash_balance`,
-    [email.toLowerCase().trim(), passwordHash, passwordSalt]
+    `INSERT INTO users (email, password_hash, password_salt, cash_balance, display_name)
+     VALUES ($1, $2, $3, ${STARTING_CASH_BALANCE}, $4)
+     RETURNING id, email, password_hash, password_salt, cash_balance, display_name`,
+    [email.toLowerCase().trim(), passwordHash, passwordSalt, displayName]
   );
   return result.rows[0];
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   const result = await getPool().query<User>(
-    `SELECT id, email, password_hash, password_salt, cash_balance FROM users WHERE email = $1`,
+    `SELECT id, email, password_hash, password_salt, cash_balance, display_name FROM users WHERE email = $1`,
     [email.toLowerCase().trim()]
   );
   return result.rows[0] ?? null;
@@ -151,10 +159,46 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 
 export async function getUserById(id: number): Promise<User | null> {
   const result = await getPool().query<User>(
-    `SELECT id, email, password_hash, password_salt, cash_balance FROM users WHERE id = $1`,
+    `SELECT id, email, password_hash, password_salt, cash_balance, display_name FROM users WHERE id = $1`,
     [id]
   );
   return result.rows[0] ?? null;
+}
+
+export async function updateDisplayName(userId: number, displayName: string): Promise<void> {
+  await getPool().query(`UPDATE users SET display_name = $1 WHERE id = $2`, [displayName, userId]);
+}
+
+export type LeaderboardUser = {
+  id: number;
+  displayName: string | null;
+  cashBalance: number;
+  holdings: Holding[];
+};
+
+export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
+  const [usersResult, holdingsResult] = await Promise.all([
+    getPool().query<{ id: number; display_name: string | null; cash_balance: string }>(
+      `SELECT id, display_name, cash_balance FROM users`
+    ),
+    getPool().query<{ user_id: number; symbol: string; quantity: string }>(
+      `SELECT user_id, symbol, quantity FROM holdings WHERE quantity > 0`
+    ),
+  ]);
+
+  const holdingsByUser = new Map<number, Holding[]>();
+  for (const h of holdingsResult.rows) {
+    const list = holdingsByUser.get(h.user_id) ?? [];
+    list.push({ symbol: h.symbol, quantity: Number(h.quantity) });
+    holdingsByUser.set(h.user_id, list);
+  }
+
+  return usersResult.rows.map((u) => ({
+    id: u.id,
+    displayName: u.display_name,
+    cashBalance: Number(u.cash_balance),
+    holdings: holdingsByUser.get(u.id) ?? [],
+  }));
 }
 
 export async function getHoldings(userId: number): Promise<Holding[]> {
