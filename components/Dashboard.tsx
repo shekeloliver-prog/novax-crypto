@@ -9,6 +9,7 @@ import { OrderBook } from "@/components/OrderBook";
 import { RecentTrades } from "@/components/RecentTrades";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
+import { Crypto101Intro } from "@/components/Crypto101Intro";
 import { DEFAULT_RANGE, labelForRange, rangeKeyOf, type RangeSelection } from "@/lib/timeRanges";
 
 const TICKER_POLL_MS = 10_000;
@@ -93,6 +94,7 @@ export function Dashboard() {
 
   return (
     <main className="flex-1 px-4 sm:px-6 py-6 max-w-[1400px] w-full mx-auto flex flex-col gap-4">
+      <Crypto101Intro />
       {error && (
         <div className="text-xs text-amber-500 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
           {error}
